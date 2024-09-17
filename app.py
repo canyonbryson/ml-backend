@@ -6,6 +6,8 @@ from flask_socketio import SocketIO, emit, send
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
+import os
+
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
@@ -236,4 +238,5 @@ def predict(data):
     
 if __name__ == '__main__':
     app.debug = True
-    socketio.run(app, host='0.0.0.0', port=5000)
+    port = int(os.getenv('PORT', 10000))
+    socketio.run(app, host='0.0.0.0', port=port)
