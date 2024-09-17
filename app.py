@@ -1,7 +1,10 @@
-from time import sleep
+import eventlet
 
-from flask import Flask, jsonify
-from flask_socketio import SocketIO, emit, send
+eventlet.monkey_patch()
+
+from flask_socketio import SocketIO, emit
+
+from flask import Flask
 
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*")
