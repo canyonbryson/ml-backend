@@ -2,19 +2,18 @@ import eventlet
 
 eventlet.monkey_patch()
 
+import os
+import threading
+
+import torch
+import torch.nn as nn
 from flask_socketio import SocketIO, emit
+from torch.nn import functional as F
 
 from flask import Flask
 
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*")
-
-import os
-
-import torch
-import torch.nn as nn
-from torch.nn import functional as F
-
 # hyperparameters
 batch_size = 64 # 128 # how many independent sequences will we process in parallel?
 block_size = 256 # 512 # what is the maximum context length for predictions?
@@ -197,9 +196,8 @@ def test_disconnect():
 def handle_message(data):
     print('received message: ' + data)
 
-@socketio.on('predict')
-def predict(data):
-    #
+
+def background_predict(data):
     text = "\n"
     model = GPTLanguageModel()
     model.load_state_dict(torch.load('model.pth', map_location=device))
@@ -209,7 +207,12 @@ def predict(data):
         context = torch.tensor(encode(text), dtype=torch.long, device=device).unsqueeze(0)
         res = decode(m.generate(context, max_new_tokens=3)[0].tolist())
         text = res
-        emit('prediction', {'data': text})
+        socketio.emit('prediction', {'data': text})
+
+@socketio.on('predict')
+def predict(data):
+    threading.Thread(target=background_predict, args=(data,)).start()
+
     
 if __name__ == '__main__':
     app.debug = True
