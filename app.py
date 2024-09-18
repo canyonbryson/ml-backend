@@ -1,19 +1,17 @@
-import eventlet
-
-eventlet.monkey_patch()
-
 import os
 import threading
 
 import torch
 import torch.nn as nn
-from flask_socketio import SocketIO, emit
+from flask import Flask, request
+from flask_cors import CORS, cross_origin
+from simple_websocket import ConnectionClosed, Server
 from torch.nn import functional as F
 
-from flask import Flask
-
 app = Flask(__name__)
-socketio = SocketIO(app, cors_allowed_origins="*")
+cors = CORS(app)
+app.config['CORS_HEADERS'] = 'Content-Type'
+
 # hyperparameters
 batch_size = 64 # 128 # how many independent sequences will we process in parallel?
 block_size = 256 # 512 # what is the maximum context length for predictions?
@@ -183,38 +181,32 @@ class GPTLanguageModel(nn.Module):
 def hello():
     return 'Hello World!'
 
-@socketio.on('connect')
-def test_connect():
-    print('Client connected')
-    emit('message', {'data': 'Connected'})
 
-@socketio.on('disconnect')
-def test_disconnect():
-    print('Client disconnected')
-
-@socketio.on('message')
-def handle_message(data):
-    print('received message: ' + data)
-
-
-def background_predict(data):
-    text = "\n"
-    model = GPTLanguageModel()
-    model.load_state_dict(torch.load('model.pth', map_location=device))
-    model.eval()
-    m = model.to(device)
-    for _ in range(100):
+@app.route('/predict')
+@cross_origin()
+def predict():
+    print('here')
+    try:
+        text = "\n"
+        model = GPTLanguageModel()
+        model.load_state_dict(torch.load('model.pth', map_location=device))
+        model.eval()
+        m = model.to(device)
         context = torch.tensor(encode(text), dtype=torch.long, device=device).unsqueeze(0)
-        res = decode(m.generate(context, max_new_tokens=3)[0].tolist())
+        res = decode(m.generate(context, max_new_tokens=300)[0].tolist())
         text = res
-        socketio.emit('prediction', {'data': text})
-
-@socketio.on('predict')
-def predict(data):
-    threading.Thread(target=background_predict, args=(data,)).start()
+        print(text)
+        json = {'data': text}
+        return json
+               
+    except ConnectionClosed:
+        pass
+    return ''
 
     
 if __name__ == '__main__':
-    app.debug = True
-    port = int(os.getenv('PORT', 10000))
-    socketio.run(app, host='0.0.0.0', port=port)
+    app.run(
+        host='127.0.0.1',
+        port=5000,
+    )
+    
