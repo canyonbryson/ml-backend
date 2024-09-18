@@ -1,11 +1,11 @@
-import os
-import threading
+import eventlet
+
+eventlet.monkey_patch()
 
 import torch
 import torch.nn as nn
 from flask import Flask, request
 from flask_cors import CORS, cross_origin
-from simple_websocket import ConnectionClosed, Server
 from torch.nn import functional as F
 
 app = Flask(__name__)
@@ -186,22 +186,18 @@ def hello():
 @cross_origin()
 def predict():
     print('here')
-    try:
-        text = "\n"
-        model = GPTLanguageModel()
-        model.load_state_dict(torch.load('model.pth', map_location=device))
-        model.eval()
-        m = model.to(device)
-        context = torch.tensor(encode(text), dtype=torch.long, device=device).unsqueeze(0)
-        res = decode(m.generate(context, max_new_tokens=300)[0].tolist())
-        text = res
-        print(text)
-        json = {'data': text}
-        return json
+    text = "\n"
+    model = GPTLanguageModel()
+    model.load_state_dict(torch.load('model.pth', map_location=device))
+    model.eval()
+    m = model.to(device)
+    context = torch.tensor(encode(text), dtype=torch.long, device=device).unsqueeze(0)
+    res = decode(m.generate(context, max_new_tokens=300)[0].tolist())
+    text = res
+    print(text)
+    json = {'data': text}
+    return json
                
-    except ConnectionClosed:
-        pass
-    return ''
 
     
 if __name__ == '__main__':
